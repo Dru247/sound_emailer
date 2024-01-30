@@ -42,15 +42,12 @@ def select_songs(message):
         era_end = era_start + int(os.getenv("ERA_DURATION"))
         with sq.connect(db) as con:
             cur = con.cursor()
-            # cur.execute(f"""
-            #     SELECT  data FROM songs
-            #     WHERE year BETWEEN {era_start} AND {era_end}
-            #     ORDER BY grade
-            # """)
             cur.execute(f"""
                 SELECT name, year, data FROM songs
+                WHERE year BETWEEN {era_start} AND {era_end}
+               ORDER BY grade
             """)
-            results = cur.fetchmany()
+            results = cur.fetchall()
             for song in results:
                 file_name = f"{song[0]}-{song[1]}.mp3"
                 with open(file_name, 'wb') as new_file:
@@ -63,7 +60,7 @@ def select_songs(message):
 
 
 def add_song(message):
-    msg = bot.send_message(chat_id=message.chat.id, text="load_song")
+    msg = bot.send_message(chat_id=message.chat.id, text='load_song > caption "name;year;grade"')
     bot.register_next_step_handler(message=msg, callback=load_song)
 
 
@@ -72,12 +69,12 @@ def load_song(message):
         file_id = message.audio.file_id
         file_info = bot.get_file(file_id)
         downloaded_file = bot.download_file(file_info.file_path)
-        logging.info(msg=f"Message: {message}")
+        f_name, f_year, f_grade = message.json["caption"].strip().split(";")
         with sq.connect(db) as con:
             cur = con.cursor()
             cur.execute(
                 "INSERT INTO songs (name, year, grade, data) VALUES (?, ?, ?, ?)",
-                (2, 3, 4, sq.Binary(downloaded_file))
+                (f_name, f_year, f_grade, sq.Binary(downloaded_file))
             )
     except Exception:
         logging.critical(msg="func load_song - error", exc_info=True)
