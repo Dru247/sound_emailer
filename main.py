@@ -27,6 +27,7 @@ commands = [
     "Get songs",
     "Add song",
     "Get list",
+    "Get song",
     "Change"
 ]
 list_keys = list()
@@ -47,18 +48,18 @@ def select_songs(message):
         with sq.connect(db) as con:
             cur = con.cursor()
             cur.execute(f"""
-                SELECT name, year, data FROM songs
+                SELECT id, name, year, grade, data FROM songs
                 WHERE year BETWEEN {era_start} AND {era_end}
                ORDER BY grade
             """)
             results = cur.fetchall()
-            for song in results:
-                file_name = f"{song[0]}-{song[1]}.mp3"
-                with open(file_name, 'wb') as new_file:
-                    new_file.write(song[2])
-                with open(file_name, "rb") as audio:
-                    bot.send_audio(message.chat.id, audio)
-                os.remove(file_name)
+        for song in results:
+            file_name = f"{song[0]}-{song[1]}-{song[2]}-{song[3]}.mp3"
+            with open(file_name, 'wb') as new_file:
+                new_file.write(song[4])
+            with open(file_name, "rb") as audio:
+                bot.send_audio(message.chat.id, audio)
+            os.remove(file_name)
     except Exception:
         logging.critical(msg="func select_songs - error", exc_info=True)
 
@@ -88,7 +89,7 @@ def get_list(message):
     try:
         with sq.connect(db) as con:
             cur = con.cursor()
-            cur.execute("SELECT id, name, year, grade FROM songs")
+            cur.execute("SELECT id, name, year, grade FROM songs ORDER BY name")
             result = cur.fetchall()
         msg_text = str()
         for song in result:
@@ -98,9 +99,39 @@ def get_list(message):
         logging.critical(msg="func get_list - error", exc_info=True)
 
 
+def get_song(message):
+    try:
+        msg = bot.send_message(chat_id=message.chat.id, text="id")
+        bot.register_next_step_handler(message=msg, callback=select_song)
+    except Exception:
+        logging.critical(msg="func get_song - error", exc_info=True)
+
+
+def select_song(message):
+    try:
+        with sq.connect(db) as con:
+            cur = con.cursor()
+            cur.execute(f"""
+                SELECT id, name, year, grade, data FROM songs
+                WHERE id = {message.text}
+            """)
+            song = cur.fetchone()
+        file_name = f"{song[0]}-{song[1]}-{song[2]}-{song[3]}.mp3"
+        with open(file_name, 'wb') as new_file:
+            new_file.write(song[4])
+        with open(file_name, "rb") as audio:
+            bot.send_audio(message.chat.id, audio)
+        os.remove(file_name)
+    except Exception:
+        logging.critical(msg="func get_song - error", exc_info=True)
+
+
 def change_song(message):
-    msg = bot.send_message(chat_id=message.chat.id, text="id")
-    bot.register_next_step_handler(message=msg, callback=change_request)
+    try:
+        msg = bot.send_message(chat_id=message.chat.id, text="id")
+        bot.register_next_step_handler(message=msg, callback=change_request)
+    except Exception:
+        logging.critical(msg="func change_song - error", exc_info=True)
 
 
 def change_request(message):
@@ -179,6 +210,8 @@ def take_text(message):
     elif message.text.lower() == commands[2].lower():
         get_list(message)
     elif message.text.lower() == commands[3].lower():
+        get_song(message)
+    elif message.text.lower() == commands[4].lower():
         change_song(message)
     else:
         logging.warning(
