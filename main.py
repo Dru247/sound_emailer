@@ -43,8 +43,11 @@ def get_songs(message):
 
 def select_songs(message):
     try:
-        era_start = datetime.datetime.now().year - int(message.text) + int(os.getenv("ERA_START"))
+        age = int(message.text)
+        era_start = datetime.datetime.now().year - age + int(os.getenv("ERA_START"))
         era_end = era_start + int(os.getenv("ERA_DURATION"))
+        if age >= 50:
+            era_end += 4
         with sq.connect(db) as con:
             cur = con.cursor()
             cur.execute(f"""
