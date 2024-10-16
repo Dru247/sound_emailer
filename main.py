@@ -37,26 +37,46 @@ keyboard_main.row(*list_keys)
 
 
 def get_songs(message):
-    msg = bot.send_message(chat_id=message.chat.id, text="era")
+    msg = bot.send_message(
+        chat_id=message.chat.id,
+        text='Введи возраст и нужное время (часы) через пробел.\nНапример: "23 2"'
+    )
     bot.register_next_step_handler(message=msg, callback=select_songs)
+
+
+def request_songs(start_year, end_year, limit):
+    try:
+        with sq.connect(db) as con:
+            cur = con.cursor()
+            cur.execute(
+                '''
+                SELECT id, name, year, grade, data FROM songs
+                WHERE year BETWEEN ? AND ?
+                ORDER BY random()
+                LIMIT ?
+                ''',
+                (start_year, end_year, limit)
+            )
+            return cur.fetchall()
+    except Exception:
+        logging.critical(msg="func get_age_songs - error", exc_info=True)
+
 
 
 def select_songs(message):
     try:
-        age = int(message.text)
-        era_start = datetime.datetime.now().year - age + int(os.getenv("ERA_START"))
-        era_end = era_start + int(os.getenv("ERA_DURATION"))
-        if age >= 50:
-            era_end += 4
-        with sq.connect(db) as con:
-            cur = con.cursor()
-            cur.execute(f"""
-                SELECT id, name, year, grade, data FROM songs
-                WHERE year BETWEEN {era_start} AND {era_end}
-               ORDER BY grade
-            """)
-            results = cur.fetchall()
-        for song in results:
+        age, time = map(int, message.text.split())
+        year_now = datetime.datetime.now().year
+        songs = list()
+        era_start = year_now - age
+        first_era_end = era_start + 6
+        songs.extend(request_songs(era_start, first_era_end, 1*time))
+        second_era_end = first_era_end + 6
+        songs.extend(request_songs(first_era_end, second_era_end, 2*time))
+        third_era_end = second_era_end + 6
+        songs.extend(request_songs(second_era_end, third_era_end, 12*time))
+        songs.extend(request_songs(third_era_end, year_now, 5*time))
+        for song in songs:
             file_name = f"{song[0]}-{song[1]}-{song[2]}-{song[3]}.mp3"
             with open(file_name, 'wb') as new_file:
                 new_file.write(song[4])
